@@ -1,0 +1,778 @@
+import chess
+import chess.pgn
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split, StratifiedKFold
+from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.neural_network import MLPClassifier
+from sklearn.metrics import (
+    classification_report, confusion_matrix, accuracy_score,
+    f1_score, precision_score, roc_auc_score, roc_curve, auc
+)
+from sklearn.decomposition import PCA
+from sklearn.feature_selection import RFECV
+from sklearn.pipeline import Pipeline
+from sklearn.linear_model import LogisticRegression
+import pickle
+import re
+from collections import Counter
+from datetime import datetime
+import warnings
+import os
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+warnings.filterwarnings('ignore', category=UserWarning)
+warnings.filterwarnings('ignore', category=FutureWarning)
+
+# ==================== CONFIGURATION ====================
+
+BASE_DIR = os.getcwd()
+
+# NOTE: Adjust these paths to your PGN file locations if necessary
+FILE_PATHS = {
+    'Marshall': os.path.join(BASE_DIR, 'Marshall.pgn'),
+    'Li': os.path.join(BASE_DIR, 'Li.pgn'),
+    'Tartakower': os.path.join(BASE_DIR, 'Tartakower.pgn'),
+    'Najdorf': os.path.join(BASE_DIR, 'Najdorf.pgn'),
+    'Kudrin': os.path.join(BASE_DIR, 'Kudrin.pgn')
+}
+
+
+PLAYERS = ['Marshall', 'Li', 'Tartakower', 'Najdorf', 'Kudrin']
+GAMES_PER_PLAYER = 1000 # Keep at 1000 for faster demonstration
+
+# --- Feature Extraction Functions (omitted for brevity, assume they are the same) ---
+# [The extract_metadata_features, extract_opening_features, extract_move_features,
+# and extract_all_features functions are used as is from the original script]
+
+def extract_metadata_features(headers):
+    """Extract features from Event, Site, Date"""
+    features = {}
+    
+    # Event features - different events for different players/eras
+    event = headers.get('Event', '').lower()
+    features['event_has_world'] = 1 if 'world' in event else 0
+    features['event_has_championship'] = 1 if 'championship' in event or 'ch' in event else 0
+    features['event_has_open'] = 1 if 'open' in event else 0
+    features['event_has_tournament'] = 1 if 'tournament' in event or 'tourn' in event else 0
+    features['event_has_match'] = 1 if 'match' in event else 0
+    features['event_has_olympiad'] = 1 if 'olympiad' in event else 0
+    features['event_length'] = min(len(event), 100)
+    
+    # Site features - geographic patterns differ by player
+    site = headers.get('Site', '').lower()
+    features['site_has_usa'] = 1 if 'usa' in site or 'us ' in site or 'new york' in site or 'chicago' in site else 0
+    features['site_has_europe'] = 1 if any(x in site for x in ['ger', 'fra', 'eng', 'ned', 'eur', 'london', 'paris', 'berlin']) else 0
+    features['site_has_asia'] = 1 if any(x in site for x in ['chn', 'ind', 'jpn', 'asia', 'beijing', 'shanghai']) else 0
+    features['site_has_russia'] = 1 if any(x in site for x in ['rus', 'soviet', 'ussr', 'moscow', 'leningrad']) else 0
+    features['site_has_argentina'] = 1 if 'arg' in site or 'argentina' in site or 'buenos aires' in site else 0
+    features['site_length'] = min(len(site), 50)
+    
+    # Date features - different eras for different players
+    date_str = headers.get('Date', '????.??.??')
+    try:
+        if date_str != '????.??.??':
+            parts = date_str.split('.')
+            year = int(parts[0]) if parts[0] != '????' else 0
+            month = int(parts[1]) if len(parts) > 1 and parts[1] != '??' else 0
+            day = int(parts[2]) if len(parts) > 2 and parts[2] != '??' else 0
+            
+            features['year'] = year if year > 0 else 1950
+            features['month'] = month if month > 0 else 6
+            features['day'] = day if day > 0 else 15
+            features['decade'] = (year // 10) * 10 if year > 0 else 1950
+            features['is_1900s'] = 1 if 1900 <= year < 1920 else 0
+            features['is_1920s'] = 1 if 1920 <= year < 1940 else 0
+            features['is_1940s'] = 1 if 1940 <= year < 1960 else 0
+            features['is_1960s'] = 1 if 1960 <= year < 1980 else 0
+            features['is_1980s'] = 1 if 1980 <= year < 2000 else 0
+            features['is_2000s'] = 1 if year >= 2000 else 0
+        else:
+            features['year'] = 1950
+            features['month'] = 6
+            features['day'] = 15
+            features['decade'] = 1950
+            features['is_1900s'] = 0
+            features['is_1920s'] = 0
+            features['is_1940s'] = 0
+            features['is_1960s'] = 0
+            features['is_1980s'] = 0
+            features['is_2000s'] = 0
+    except:
+        features['year'] = 1950
+        features['month'] = 6
+        features['day'] = 15
+        features['decade'] = 1950
+        features['is_1900s'] = 0
+        features['is_1920s'] = 0
+        features['is_1940s'] = 0
+        features['is_1960s'] = 0
+        features['is_1980s'] = 0
+        features['is_2000s'] = 0
+    
+    # ECO code - opening classification
+    eco = headers.get('ECO', 'A00')
+    if eco and len(eco) >= 1:
+        features['eco_letter'] = ord(eco[0]) - ord('A') if eco[0].isalpha() else 0
+        features['eco_number'] = int(eco[1:]) if len(eco) > 1 and eco[1:].isdigit() else 0
+    else:
+        features['eco_letter'] = 0
+        features['eco_number'] = 0
+    
+    # Result
+    result = headers.get('Result', '*')
+    features['result_white_win'] = 1 if result == '1-0' else 0
+    features['result_black_win'] = 1 if result == '0-1' else 0
+    features['result_draw'] = 1 if result == '1/2-1/2' else 0
+    
+    return features
+
+def extract_opening_features(moves, max_opening_moves=12):
+    """Extract opening pattern features"""
+    features = {}
+    
+    if len(moves) == 0:
+        # Return zero features
+        features['opening_e4'] = 0
+        features['opening_d4'] = 0
+        features['opening_c4'] = 0
+        features['opening_nf3'] = 0
+        features['opening_length'] = 0
+        features['early_knight_dev'] = 0
+        features['early_bishop_dev'] = 0
+        features['early_castling'] = 0
+        features['early_queen_move'] = 0
+        features['opening_symmetry'] = 0
+        return features
+    
+    opening_moves = moves[:max_opening_moves] if len(moves) >= max_opening_moves else moves
+    opening_str = ' '.join(opening_moves).lower()
+    
+    # First move analysis
+    if len(opening_moves) > 0:
+        first_move = opening_moves[0].lower()
+        features['opening_e4'] = 1 if 'e4' in first_move else 0
+        features['opening_d4'] = 1 if 'd4' in first_move else 0
+        features['opening_c4'] = 1 if 'c4' in first_move else 0
+        features['opening_nf3'] = 1 if 'nf3' in first_move else 0
+    else:
+        features['opening_e4'] = 0
+        features['opening_d4'] = 0
+        features['opening_c4'] = 0
+        features['opening_nf3'] = 0
+    
+    # Opening characteristics
+    features['opening_length'] = len(opening_moves)
+    features['early_knight_dev'] = min(opening_str.count('n'), 4)
+    features['early_bishop_dev'] = min(opening_str.count('b'), 4)
+    features['early_castling'] = 1 if 'o-o' in opening_str else 0
+    features['early_queen_move'] = 1 if 'q' in opening_str else 0
+    
+    # Symmetry detection
+    if len(opening_moves) >= 4:
+        features['opening_symmetry'] = 1 if opening_moves[0] == opening_moves[1] else 0
+    else:
+        features['opening_symmetry'] = 0
+    
+    return features
+
+def extract_move_features(moves):
+    """Extract comprehensive features from move list"""
+    features = {}
+    board = chess.Board()
+    
+    # Basic statistics
+    num_moves = len(moves)
+    features['total_moves'] = num_moves
+    features['game_length_short'] = 1 if num_moves < 30 else 0
+    features['game_length_medium'] = 1 if 30 <= num_moves < 60 else 0
+    features['game_length_long'] = 1 if num_moves >= 60 else 0
+    
+    # Move type counters
+    captures = 0
+    checks = 0
+    castles = 0
+    promotions = 0
+    pawn_moves = 0
+    knight_moves = 0
+    bishop_moves = 0
+    rook_moves = 0
+    queen_moves = 0
+    king_moves = 0
+    
+    # Positional counters
+    center_moves = 0
+    edge_moves = 0
+    
+    # Advanced tracking
+    material_scores = []
+    mobility_scores = []
+    piece_square_scores = []
+    
+    # Process each move
+    for idx, move_san in enumerate(moves):
+        try:
+            move = board.parse_san(move_san)
+            
+            # Move type analysis
+            if 'x' in move_san:
+                captures += 1
+            if '+' in move_san:
+                checks += 1
+            if '#' in move_san:
+                checks += 2  # Checkmate is stronger
+            if 'O-O' in move_san or '0-0' in move_san:
+                castles += 1
+            if '=' in move_san:
+                promotions += 1
+            
+            # Piece that moved
+            piece = board.piece_at(move.from_square)
+            if piece:
+                piece_type = piece.piece_type
+                if piece_type == chess.PAWN:
+                    pawn_moves += 1
+                elif piece_type == chess.KNIGHT:
+                    knight_moves += 1
+                elif piece_type == chess.BISHOP:
+                    bishop_moves += 1
+                elif piece_type == chess.ROOK:
+                    rook_moves += 1
+                elif piece_type == chess.QUEEN:
+                    queen_moves += 1
+                elif piece_type == chess.KING:
+                    king_moves += 1
+            
+            # Square analysis
+            to_file = chess.square_file(move.to_square)
+            to_rank = chess.square_rank(move.to_square)
+            
+            # Center control (d4, e4, d5, e5)
+            if move.to_square in [chess.D4, chess.E4, chess.D5, chess.E5]:
+                center_moves += 1
+            
+            # Edge moves
+            if to_file in [0, 7] or to_rank in [0, 7]:
+                edge_moves += 1
+            
+            # Apply move
+            board.push(move)
+            
+            # Calculate material balance
+            material_white = (
+                len(board.pieces(chess.PAWN, chess.WHITE)) * 1 +
+                len(board.pieces(chess.KNIGHT, chess.WHITE)) * 3 +
+                len(board.pieces(chess.BISHOP, chess.WHITE)) * 3 +
+                len(board.pieces(chess.ROOK, chess.WHITE)) * 5 +
+                len(board.pieces(chess.QUEEN, chess.WHITE)) * 9
+            )
+            material_black = (
+                len(board.pieces(chess.PAWN, chess.BLACK)) * 1 +
+                len(board.pieces(chess.KNIGHT, chess.BLACK)) * 3 +
+                len(board.pieces(chess.BISHOP, chess.BLACK)) * 3 +
+                len(board.pieces(chess.ROOK, chess.BLACK)) * 5 +
+                len(board.pieces(chess.QUEEN, chess.BLACK)) * 9
+            )
+            material_scores.append(material_white - material_black)
+            
+            # Mobility (number of legal moves)
+            mobility_scores.append(board.legal_moves.count())
+            
+        except Exception as e:
+            continue
+    
+    # Aggregate move statistics
+    features['captures'] = captures
+    features['checks'] = checks
+    features['castles'] = castles
+    features['promotions'] = promotions
+    features['pawn_moves'] = pawn_moves
+    features['knight_moves'] = knight_moves
+    features['bishop_moves'] = bishop_moves
+    features['rook_moves'] = rook_moves
+    features['queen_moves'] = queen_moves
+    features['king_moves'] = king_moves
+    features['center_moves'] = center_moves
+    features['edge_moves'] = edge_moves
+    
+    # Ratios and rates
+    if num_moves > 0:
+        features['capture_rate'] = captures / num_moves
+        features['check_rate'] = checks / num_moves
+        features['pawn_move_rate'] = pawn_moves / num_moves
+        features['knight_move_rate'] = knight_moves / num_moves
+        features['bishop_move_rate'] = bishop_moves / num_moves
+        features['rook_move_rate'] = rook_moves / num_moves
+        features['queen_move_rate'] = queen_moves / num_moves
+        features['piece_move_rate'] = (knight_moves + bishop_moves + rook_moves + queen_moves) / num_moves
+        features['center_rate'] = center_moves / num_moves
+    else:
+        features['capture_rate'] = 0
+        features['check_rate'] = 0
+        features['pawn_move_rate'] = 0
+        features['knight_move_rate'] = 0
+        features['bishop_move_rate'] = 0
+        features['rook_move_rate'] = 0
+        features['queen_move_rate'] = 0
+        features['piece_move_rate'] = 0
+        features['center_rate'] = 0
+    
+    # Material statistics
+    if len(material_scores) > 0:
+        features['avg_material'] = np.mean(material_scores)
+        features['max_material'] = np.max(material_scores)
+        features['min_material'] = np.min(material_scores)
+        features['material_variance'] = np.var(material_scores)
+        features['material_range'] = np.max(material_scores) - np.min(material_scores)
+    else:
+        features['avg_material'] = 0
+        features['max_material'] = 0
+        features['min_material'] = 0
+        features['material_variance'] = 0
+        features['material_range'] = 0
+    
+    # Mobility statistics
+    if len(mobility_scores) > 0:
+        features['avg_mobility'] = np.mean(mobility_scores)
+        features['max_mobility'] = np.max(mobility_scores)
+        features['min_mobility'] = np.min(mobility_scores)
+        features['mobility_variance'] = np.var(mobility_scores)
+    else:
+        features['avg_mobility'] = 0
+        features['max_mobility'] = 0
+        features['min_mobility'] = 0
+        features['mobility_variance'] = 0
+    
+    # Tactical complexity
+    features['tactical_complexity'] = (captures + checks + promotions) / max(num_moves, 1)
+    
+    return features
+
+def extract_all_features(pgn_game, player_name):
+    """Extract all features from a PGN game"""
+    try:
+        # Get headers
+        headers = dict(pgn_game.headers)
+        
+        # Determine if target player is White or Black
+        white_name = headers.get('White', '').lower()
+        black_name = headers.get('Black', '').lower()
+        player_lower = player_name.lower()
+        
+        # Check for player name in either position
+        is_white = player_lower in white_name
+        is_black = player_lower in black_name
+        
+        if not is_white and not is_black:
+            return None
+        
+        # Extract moves
+        moves = []
+        board = pgn_game.board()
+        for move in pgn_game.mainline_moves():
+            moves.append(board.san(move))
+            board.push(move)
+        
+        if len(moves) < 10:  # Skip very short games
+            return None
+        
+        # Initialize features dictionary
+        features = {}
+        
+        # Player color feature
+        features['is_white'] = 1 if is_white else 0
+        features['is_black'] = 1 if is_black else 0
+        
+        # Extract all feature types
+        metadata_features = extract_metadata_features(headers)
+        features.update(metadata_features)
+        
+        opening_features = extract_opening_features(moves)
+        features.update(opening_features)
+        
+        move_features = extract_move_features(moves)
+        features.update(move_features)
+        
+        return features
+        
+    except Exception as e:
+        return None
+
+def load_games_for_player(file_path, player_name, num_games):
+    """Load games for a specific player"""
+    games_data = []
+    
+    # print(f"\nLoading {player_name} from {file_path}") # Suppress for cleaner output
+    
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as pgn_file:
+            game_count = 0
+            total_checked = 0
+            
+            while game_count < num_games:
+                game = chess.pgn.read_game(pgn_file)
+                if game is None:
+                    # print(f"  Reached end of file after checking {total_checked} games")
+                    break
+                
+                total_checked += 1
+                
+                # Check if player is in this game
+                white = game.headers.get('White', '').lower()
+                black = game.headers.get('Black', '').lower()
+                player_lower = player_name.lower()
+                
+                if player_lower in white or player_lower in black:
+                    features = extract_all_features(game, player_name)
+                    if features is not None:
+                        games_data.append(features)
+                        game_count += 1
+                        
+                        # if game_count % 100 == 0:
+                            # print(f"  ✓ Loaded {game_count}/{num_games} games")
+    
+    except FileNotFoundError:
+        print(f"  ✗ ERROR: File not found: {file_path}")
+    except Exception as e:
+        print(f"  ✗ ERROR loading {player_name}: {e}")
+    
+    print(f"  ✓ Total loaded: {len(games_data)} games for {player_name}")
+    return games_data
+
+def load_all_data():
+    """Load all games for all players"""
+    all_data = []
+    all_labels = []
+    
+    for player in PLAYERS:
+        file_path = FILE_PATHS[player]
+        games = load_games_for_player(file_path, player, GAMES_PER_PLAYER)
+        
+        all_data.extend(games)
+        all_labels.extend([player] * len(games))
+    
+    return all_data, all_labels
+
+def create_mlp_classifier():
+    """Returns the configured MLPClassifier model."""
+    return MLPClassifier(
+        hidden_layer_sizes=(256, 128, 64, 32),
+        activation='relu',
+        solver='adam',
+        alpha=0.001,
+        batch_size=32,
+        learning_rate='adaptive',
+        learning_rate_init=0.001,
+        max_iter=500,
+        early_stopping=True,
+        validation_fraction=0.1,
+        n_iter_no_change=20,
+        random_state=42,
+        verbose=False # Set to False for cleaner final output
+    )
+
+def plot_confusion_matrix(cm, classes, title='Confusion Matrix (Test Set)'):
+    """Placeholder for Confusion Matrix plot."""
+    # This function would use matplotlib/seaborn to create a heatmap.
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', cbar=False,
+                xticklabels=classes, yticklabels=classes)
+    plt.title(title)
+    plt.xlabel('Predicted Label')
+    plt.ylabel('True Label')
+    plt.savefig('confusion_matrix.png')
+    plt.close()
+    print("")
+
+def plot_class_distribution(y_labels, classes, title='Class Distribution'):
+    """Placeholder for Class Distribution plot."""
+    # This function would use matplotlib/seaborn to create a bar chart.
+    counts = Counter(y_labels)
+    labels = [classes[i] for i in counts.keys()]
+    values = counts.values()
+
+    plt.figure(figsize=(8, 6))
+    sns.barplot(x=labels, y=values)
+    plt.title(title)
+    plt.xlabel('Chess Player')
+    plt.ylabel('Number of Games')
+    plt.savefig('class_distribution.png')
+    plt.close()
+    print("")
+
+def plot_pca_projection(X_pca, y_encoded, classes, title='PCA 2D Projection of Features'):
+    """Placeholder for PCA 2D Scatter Plot."""
+    # This function would use matplotlib/seaborn to create a scatter plot.
+    plt.figure(figsize=(10, 8))
+    for i, target_name in enumerate(classes):
+        plt.scatter(X_pca[y_encoded == i, 0], X_pca[y_encoded == i, 1],
+                    alpha=.8, label=target_name)
+    plt.legend(loc="best", shadow=False, scatterpoints=1)
+    plt.title(title)
+    plt.xlabel('Principal Component 1')
+    plt.ylabel('Principal Component 2')
+    plt.savefig('pca_2d_projection.png')
+    plt.close()
+    print("")
+
+def plot_roc_curve(y_test, y_score, classes):
+    """Placeholder for Multi-class ROC Curve plot."""
+    # This function would use matplotlib/sklearn to plot ROC curves.
+    from sklearn.preprocessing import label_binarize
+    y_test_bin = label_binarize(y_test, classes=range(len(classes)))
+    n_classes = len(classes)
+    
+    fpr = dict()
+    tpr = dict()
+    roc_auc = dict()
+    for i in range(n_classes):
+        fpr[i], tpr[i], _ = roc_curve(y_test_bin[:, i], y_score[:, i])
+        roc_auc[i] = auc(fpr[i], tpr[i])
+
+    plt.figure(figsize=(10, 8))
+    for i in range(n_classes):
+        plt.plot(fpr[i], tpr[i], label=f'ROC curve of {classes[i]} (area = {roc_auc[i]:0.2f})')
+    
+    plt.plot([0, 1], [0, 1], 'k--', label='Chance')
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Receiver Operating Characteristic (ROC) Curve')
+    plt.legend(loc="lower right")
+    plt.savefig('roc_curve.png')
+    plt.close()
+    print("")
+
+
+# ==================== MAIN TRAINING PIPELINE ====================
+
+def main():
+    print("=" * 80)
+    print(" CHESS PLAYER CLASSIFICATION - ENHANCED TRAINING PIPELINE")
+    print("=" * 80)
+    print(f"\nTarget Players: {', '.join(PLAYERS)}")
+    print(f"Games per player: {GAMES_PER_PLAYER}")
+    
+    # Step 1: Load data
+    print("\n" + "=" * 80)
+    print("[STEP 1/9] LOADING PGN DATA")
+    print("=" * 80)
+    all_data, all_labels = load_all_data()
+    
+    if len(all_data) == 0:
+        print("\n✗ ERROR: No data loaded! Check file paths and player names.")
+        return
+    
+    # Step 2: Create DataFrame, Encode Labels, and Split
+    print("\n" + "=" * 80)
+    print("[STEP 2/9] PREPARING DATA")
+    print("=" * 80)
+    
+    df = pd.DataFrame(all_data)
+    df['label'] = all_labels
+    df = df.fillna(0) # Fill NaNs
+    
+    X_full = df.drop('label', axis=1)
+    y_full = df['label'].values
+    full_feature_names = list(X_full.columns)
+
+    label_encoder = LabelEncoder()
+    y_encoded = label_encoder.fit_transform(y_full)
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X_full.values, y_encoded, test_size=0.2, random_state=42, stratify=y_encoded
+    )
+    
+    print(f"\n✓ Initial DataFrame shape: {df.shape}")
+    print(f"✓ Total features: {len(full_feature_names)}")
+    print(f"✓ Training samples: {len(X_train)}, Testing samples: {len(X_test)}")
+    
+    # Visualization: Class Distribution
+    print("\n" + "=" * 80)
+    print("VISUALIZATION: CLASS DISTRIBUTION")
+    print("=" * 80)
+    plot_class_distribution(y_encoded, label_encoder.classes_, 'Initial Class Distribution')
+    
+    # Step 3: Initial Scaling and PCA for EDA
+    print("\n" + "=" * 80)
+    print("[STEP 3/9] INITIAL SCALING AND EDA (PCA)")
+    print("=" * 80)
+
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train)
+    X_test_scaled = scaler.transform(X_test)
+
+    # PCA
+    pca = PCA(n_components=2)
+    X_pca = pca.fit_transform(X_train_scaled)
+    print(f"\n✓ PCA Variance Captured by 2 Components: {sum(pca.explained_variance_ratio_)*100:.2f}%")
+    plot_pca_projection(X_pca, y_train, label_encoder.classes_)
+    
+    # =========================================================
+    # MODIFIED STEP 4/9: Automated Feature Selection (RFECV)
+    # =========================================================
+    print("\n" + "=" * 80)
+    print("[STEP 4/9] AUTOMATED FEATURE SELECTION (RFECV)")
+    print("=" * 80)
+
+    # FIX: Replace the MLPClassifier with a compatible estimator (e.g., Logistic Regression)
+    # MLPClassifier does not have 'coef_' or 'feature_importances_'
+    surrogate_estimator = LogisticRegression(
+        max_iter=2000,          # Increase iterations for convergence
+        penalty='l2',           # Use L2 regularization
+        solver='lbfgs',
+        random_state=42,
+        n_jobs=-1               # Use all cores for speed
+    )
+
+    # RFECV with Stratified K-Fold for multiclass classification
+    rfecv = RFECV(
+        estimator=surrogate_estimator,  # Use the compatible Logistic Regression
+        step=1,
+        cv=StratifiedKFold(5), # 5-fold cross-validation
+        scoring='accuracy',
+        min_features_to_select=5, 
+        n_jobs=-1
+    )
+
+    print("\nStarting RFECV using Logistic Regression as the feature ranker...")
+    # RFECV uses CV internally, we fit it on the scaled training data
+    rfecv.fit(X_train_scaled, y_train)
+
+    
+    optimal_feature_count = rfecv.n_features_
+    selected_mask = rfecv.support_
+    selected_feature_names = np.array(full_feature_names)[selected_mask]
+    
+    print(f"\n✓ RFECV completed!")
+    print(f"✓ Optimal number of features: {optimal_feature_count}")
+    print(f"✓ Accuracy achieved with optimal features: {rfecv.cv_results_['mean_test_score'][optimal_feature_count - 1]:.4f}")
+    print(f"\nSelected Features ({optimal_feature_count}):\n{', '.join(selected_feature_names)}")
+    
+    # Visualization: RFECV score vs number of features
+    plt.figure(figsize=(10, 6))
+    plt.xlabel("Number of Features Selected")
+    plt.ylabel("Cross Validation Score (Accuracy)")
+    plt.plot(range(1, len(rfecv.cv_results_['mean_test_score']) + 1), rfecv.cv_results_['mean_test_score'])
+    plt.axvline(x=optimal_feature_count, color='r', linestyle='--', label='Optimal Feature Count')
+    plt.legend()
+    plt.savefig('rfecv_optimization_curve.png')
+    plt.close()
+    print("")
+    
+    # Step 5: Filter data with selected features
+    print("\n" + "=" * 80)
+    print("[STEP 5/9] RE-SPLITTING DATA WITH OPTIMAL FEATURES")
+    print("=" * 80)
+    
+    # Filter the original full dataset (X_full) to get the feature-optimized dataframe
+    df_optimized = X_full[selected_feature_names].copy()
+    df_optimized['label'] = y_full
+    df_optimized.to_csv('chess_games_optimized_features.csv', index=False)
+    
+    X_opt = df_optimized.drop('label', axis=1).values
+    y_opt = df_optimized['label'].values # y_full/y_encoded is still valid
+    
+    # Re-split the filtered data
+    X_train_opt, X_test_opt, y_train_opt, y_test_opt = train_test_split(
+        X_opt, y_encoded, test_size=0.2, random_state=42, stratify=y_encoded
+    )
+    
+    # Re-scale the filtered data
+    scaler_opt = StandardScaler()
+    X_train_scaled_opt = scaler_opt.fit_transform(X_train_opt)
+    X_test_scaled_opt = scaler_opt.transform(X_test_opt)
+    
+    print(f"\n✓ Optimized features selected: {len(selected_feature_names)}")
+    print(f"✓ Optimized DataFrame saved: chess_games_optimized_features.csv")
+    print(f"✓ Feature reduction: {len(full_feature_names)} -> {len(selected_feature_names)}")
+    
+    # Step 6: Final Model Training on Optimal Features
+    print("\n" + "=" * 80)
+    print("[STEP 6/9] FINAL ANN MODEL TRAINING (Optimal Features)")
+    print("=" * 80)
+    
+    final_model = create_mlp_classifier()
+    print(f"\nTraining final model on {len(selected_feature_names)} features...")
+    final_model.fit(X_train_scaled_opt, y_train_opt)
+    print(f"✓ Final training completed!")
+    
+    # Step 7: Final Model Evaluation
+    print("\n" + "=" * 80)
+    print("[STEP 7/9] FINAL MODEL EVALUATION")
+    print("=" * 80)
+    
+    y_train_pred_opt = final_model.predict(X_train_scaled_opt)
+    y_test_pred_opt = final_model.predict(X_test_scaled_opt)
+    y_test_proba_opt = final_model.predict_proba(X_test_scaled_opt)
+    
+    # Calculate Metrics
+    train_accuracy_opt = accuracy_score(y_train_opt, y_train_pred_opt)
+    test_accuracy_opt = accuracy_score(y_test_opt, y_test_pred_opt)
+    test_f1_macro_opt = f1_score(y_test_opt, y_test_pred_opt, average='macro')
+    test_precision_macro_opt = precision_score(y_test_opt, y_test_pred_opt, average='macro', zero_division=0)
+    test_roc_auc_ovo = roc_auc_score(y_test_opt, y_test_proba_opt, multi_class='ovo')
+
+    # Metric Table
+    print("\n" + "=" * 50)
+    print("PERFORMANCE METRICS TABLE")
+    print("=" * 50)
+    
+    performance_data = [
+        ['Test Accuracy', f"{test_accuracy_opt*100:.2f}%"],
+        ['Test F1-Macro', f"{test_f1_macro_opt:.4f}"],
+        ['Test Precision-Macro', f"{test_precision_macro_opt:.4f}"],
+        ['Test ROC-AUC (OVO)', f"{test_roc_auc_ovo:.4f}"],
+        ['Training Accuracy', f"{train_accuracy_opt*100:.2f}%"]
+    ]
+    
+    print(pd.DataFrame(performance_data, columns=['Metric', 'Value']).to_markdown(index=False))
+
+    # Detailed Classification Report
+    print("\n" + "=" * 80)
+    print("DETAILED CLASSIFICATION REPORT (Test Set - Optimal Features)")
+    print("=" * 80)
+    print(classification_report(y_test_opt, y_test_pred_opt, target_names=label_encoder.classes_, digits=4))
+    
+    # Step 8: Visualizations (Confusion Matrix, ROC Curve)
+    print("\n" + "=" * 80)
+    print("[STEP 8/9] VISUALIZATIONS")
+    print("=" * 80)
+
+    # Confusion Matrix
+    cm_opt = confusion_matrix(y_test_opt, y_test_pred_opt)
+    plot_confusion_matrix(cm_opt, label_encoder.classes_)
+    
+    # ROC Curve
+    plot_roc_curve(y_test_opt, y_test_proba_opt, label_encoder.classes_)
+
+    # Step 9: Save Model Artifacts
+    print("\n" + "=" * 80)
+    print("[STEP 9/9] SAVING MODEL ARTIFACTS")
+    print("=" * 80)
+    
+    model_data = {
+        'model': final_model,
+        'scaler': scaler_opt,
+        'label_encoder': label_encoder,
+        'feature_names': selected_feature_names.tolist(),
+        'players': PLAYERS,
+        'train_accuracy': train_accuracy_opt,
+        'test_accuracy': test_accuracy_opt
+    }
+    
+    model_filename = 'chess_player_classifier_optimized.pkl'
+    with open(model_filename, 'wb') as f:
+        pickle.dump(model_data, f)
+    
+    print(f"\n✓ Final Model saved: {model_filename}")
+    print(f"✓ Final Test Accuracy: {test_accuracy_opt*100:.2f}%")
+    print(f"✓ Feature List: {len(selected_feature_names)} features retained.")
+    
+    print("\n" + "=" * 80)
+    print("🎉 ENHANCED TRAINING PIPELINE COMPLETE!")
+    print("=" * 80)
+    print("\nNext step: Use the 'chess_player_classifier_optimized.pkl' file to classify unseen data.")
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,182 @@
+[Event "FRA-URS"]
+[Site "Paris"]
+[Date "1954.??.??"]
+[Round "1.2"]
+[White "unknown"]
+[Black "Keres, Paul"]
+[Result "0-1"]
+[WhiteElo ""]
+[BlackElo ""]
+[ECO "A02"]
+
+1.f4 Nf6 2.Nf3 c5 3.e3 b6 4.b3 g6 5.Bb2 Bg7 6.e4 d6 7.g3 O-O 8.Bg2 Nc6 9.d3 Bb7
+10.O-O d5 11.exd5 Nxd5 12.Bxg7 Kxg7 13.Qd2 Rc8 14.Na3 Qc7 15.Rae1 Rfd8 16.f5 Nf6
+17.Bh3 Nd4 18.Nh4 Qc6 19.Bg2 Qd7 20.Bxb7 Qxb7 21.c3 Nc6 22.fxg6 hxg6 23.Qg5 Rd5
+24.Nf5+ Rxf5 25.Rxf5 Nh7 26.Qg4 Nf6 27.Rxf6 exf6 28.Nc4 Rd8 29.Qe4 Qd7 30.a4 Rh8
+31.Re3 Rh5 32.Qf4 Rd5 33.Rf3 Qd8 34.Qd2 a6 35.Qe2 b5 36.axb5 axb5 37.Ne3 Rd6
+38.Ng4 f5 39.Nf2 b4 40.cxb4 Nd4 41.Qb2 Qf6 42.Kg2 Nxf3 43.Qxf6+ Rxf6 44.Kxf3 cxb4
+45.Ke3 Rc6 46.Nd1 Kf6 47.d4 Rc2 48.Kd3 Rxh2 49.Ne3 Ke6 50.Kc4 Re2 51.Nf1 g5
+52.Kxb4 Kd5 53.Kc3 Re1 54.Nd2 Re3+ 55.Kc2 Kxd4 56.b4 Rxg3  0-1
+
+[Event "FRA-URS"]
+[Site "Paris"]
+[Date "1954.??.??"]
+[Round "2.2"]
+[White "Keres, Paul"]
+[Black "unknown"]
+[Result "1-0"]
+[WhiteElo ""]
+[BlackElo ""]
+[ECO "B10"]
+
+1.e4 c6 2.Nc3 d5 3.Nf3 d4 4.Ne2 c5 5.Ng3 Nc6 6.Bc4 e5 7.d3 Be7 8.O-O Nf6
+9.Nh4 O-O 10.a4 Nxe4 11.Nxe4 Bxh4 12.f4 exf4 13.Bxf4 Be7 14.Qh5 Be6 15.Rf3 Qd7
+16.Rg3 Kh8 17.Rf1 f6 18.Rff3 g5 19.Rh3 Bf5 20.g4 Bxe4 21.dxe4 Bd8 22.Bd6 Bc7
+23.Be6 Qg7 24.Bxf8 Rxf8 25.Bf5 Rf7 26.Bxh7 Re7 27.e5 Nxe5 28.Be4+ Kg8 29.Bd5+ Nf7
+30.Bxb7 Bxh2+ 31.Rxh2 Rxb7 32.Re2 Kf8 33.Rf5 Qh6 34.Qxh6+ Nxh6 35.Rxf6+ Kg7
+36.Rc6 Nxg4 37.Rxc5 Kf6 38.Re4 Ne3 39.b3 Rd7 40.Kf2 Kg6 41.Re8 Rf7+ 42.Ke2 Nf5
+43.Re6+ Kh5 44.Kd3 Kg4 45.b4 Kf4 46.Re4+ Kf3 47.Re1 Kf4 48.Rf1+ Kg4 49.b5 Rf6
+50.a5  1-0
+
+[Event "Stockholm ol"]
+[Site "Stockholm"]
+[Date "1937.??.??"]
+[Round "8"]
+[White "unknown"]
+[Black "Solin, Ilmari"]
+[Result "1-0"]
+[WhiteElo ""]
+[BlackElo ""]
+[ECO "B07"]
+
+1.d4 Nf6 2.Nf3 g6 3.Nbd2 Bg7 4.e4 O-O 5.Bd3 d6 6.O-O Nc6 7.c3 Ne8 8.Nc4 e5
+9.Bg5 f6 10.Be3 Kh8 11.Qe2 Bd7 12.Rae1 b5 13.Na3 a6 14.Nc2 f5 15.Bg5 Qc8
+16.exf5 gxf5 17.d5 Nd8 18.Nh4 Nf6 19.Qd2 Nxd5 20.f4 e4 21.Bxe4 fxe4 22.Qxd5 Bc6
+23.Qd1 Ne6 24.Nd4 Nxd4 25.cxd4 Qe6 26.f5 Qd5 27.Be3 Be8 28.Qg4 Bxd4 29.Qh3 Rf6
+30.g4 Bxe3+ 31.Qxe3 Qd3 32.Qxe4 Qxe4 33.Rxe4 Rf7 34.Rc1 c5 35.Rd1 Rd8 36.Re6 d5
+37.f6 Bd7 38.Rxd5 Rg8 39.Rxa6 Rxg4+ 40.Kf2 h6 41.Nf3 Rf4 42.Ke3 Bh3 43.Kxf4  1-0
+
+[Event "Warsaw ol"]
+[Site "Warsaw"]
+[Date "1935.??.??"]
+[Round "?"]
+[White "Frydman, Paulino"]
+[Black "unknown"]
+[Result "1/2-1/2"]
+[WhiteElo ""]
+[BlackElo ""]
+[ECO "E39"]
+
+1.d4 Nf6 2.c4 e6 3.Nc3 Bb4 4.Qc2 c5 5.dxc5 O-O 6.Nf3 Na6 7.Bd2 Nxc5 8.e3 b6
+9.Be2 Bb7 10.O-O Qe7 11.a3 Bxc3 12.Bxc3 d5 13.Ng5 Nfe4 14.Nxe4 Nxe4 15.Bb4 Nc5
+16.cxd5 Bxd5 17.e4 Bb7 18.Bxc5 Qxc5 19.Qxc5 bxc5 20.f3 Rfd8 21.Rfd1 Kf8 22.Kf2 Ke7
+23.Ke3 e5 24.Rxd8 Rxd8 25.Rc1 Rc8 26.Rc4 Ba6 27.Rc2 Bxe2 28.Kxe2 Kd6 29.Kd3 Kc6
+30.Ke2 a5 31.Rd2 Rf8 32.Kd1 f5 33.exf5 Rxf5 34.Re2 Kd5 35.Rd2+ Kc6 36.Kc2 Rf4  1/2-1/2
+
+
+[Event "Warsaw ol"]
+[Site "Warsaw"]
+[Date "1935.??.??"]
+[Round "?"]
+[White "unknown"]
+[Black "Gruenfeld, Ernst"]
+[Result "1-0"]
+[WhiteElo ""]
+[BlackElo ""]
+[ECO "D27"]
+
+1.d4 d5 2.c4 dxc4 3.e3 Nf6 4.Bxc4 e6 5.Nc3 c5 6.Nf3 a6 7.a4 Nc6 8.O-O Be7
+9.Qe2 cxd4 10.Rd1 d3 11.Bxd3 Qc7 12.e4 Ng4 13.h3 Nge5 14.Nxe5 Nxe5 15.Bf4 Bd6
+16.Bb5+ Ke7 17.Rac1 Qb8 18.Bg3 f6 19.Bd3 Bd7 20.Bb1 g5 21.Rd2 Bc6 22.Rcd1 Bb4
+23.Ba2 Qc7 24.Rc2 Rad8 25.Rxd8 Qxd8 26.Bxe5 fxe5 27.Nd5+ exd5 28.exd5 Bd7
+29.Qxe5+ Kf7 30.Rc7 Re8 31.Qf5+ Ke7 32.Qe6+ Kf8 33.Rxd7 Rxe6 34.Rxd8+ Re8
+35.Rxe8+ Kxe8 36.Kf1  1-0
+
+[Event "Folkestone ol"]
+[Site "Folkestone"]
+[Date "1933.??.??"]
+[Round "15"]
+[White "unknown"]
+[Black "Treybal, Karel"]
+[Result "1-0"]
+[WhiteElo ""]
+[BlackElo ""]
+[ECO "D55"]
+
+1.d4 d5 2.c4 e6 3.Nf3 Nf6 4.Nc3 Be7 5.Bg5 O-O 6.e3 Ne4 7.Bxe7 Qxe7 8.cxd5 Nxc3
+9.bxc3 exd5 10.Qb3 Rd8 11.Bd3 c5 12.Qa3 b6 13.O-O Nc6 14.Bb5 c4 15.Qxe7 Nxe7
+16.Ba4 Bf5 17.Rfc1 a6 18.Bc2 b5 19.Nd2 Be6 20.Rcb1 f5 21.a3 Ng6 22.f4 Rdb8
+23.Nf3 Rb7 24.Ne5 Nxe5 25.fxe5 Rab8 26.Rb2 a5 27.Rab1 Kf7 28.Rf1 b4 29.axb4 axb4
+30.g4 Kg8 31.gxf5 Bd7 32.e6 Bc6 33.cxb4 Rxb4 34.Rxb4 Rxb4 35.Ra1 Kf8 36.Ra6 Be8
+37.e4 Rb5 38.Ra8 Ke7 39.Rxe8+ Kxe8 40.Ba4  1-0
+
+[Event "Folkestone ol"]
+[Site "Folkestone"]
+[Date "1933.??.??"]
+[Round "7"]
+[White "unknown"]
+[Black "Thomas, George Alan"]
+[Result "1-0"]
+[WhiteElo ""]
+[BlackElo ""]
+[ECO "D36"]
+
+1.Nf3 Nf6 2.c4 e6 3.Nc3 d5 4.d4 c6 5.Bg5 Nbd7 6.cxd5 exd5 7.e3 Be7 8.Qc2 h6
+9.Bf4 O-O 10.h3 Re8 11.Bd3 Nf8 12.O-O-O Bd6 13.Ne5 Qe7 14.g4 N6d7 15.Nxd7 Bxd7
+16.Bxd6 Qxd6 17.Kb1 Re7 18.Rhg1 Rae8 19.h4 Kh8 20.Qe2 Ng6 21.Bc2 Nxh4 22.g5 Bf5
+23.gxh6 Bxc2+ 24.Qxc2 g6 25.Rh1 Nf5 26.Rdg1 Qf6 27.Ne2 Kh7 28.Nf4 Re4 29.Qd3 Kh8
+30.a3 Nxd4 31.Qc3 Qf5 32.Nd3 c5 33.Ka2 Kh7 34.Nxc5 Ne2 35.Qg7+  1-0
+
+
+[Event "Prague ol"]
+[Site "Prague"]
+[Date "1931.??.??"]
+[Round "16"]
+[White "unknown"]
+[Black "Zimmermann, Otto"]
+[Result "0-1"]
+[WhiteElo ""]
+[BlackElo ""]
+[ECO "E12"]
+
+1.d4 Nf6 2.Nf3 b6 3.c4 e6 4.Nc3 Bb7 5.Bg5 Be7 6.Qc2 c5 7.d5 Nxd5 8.cxd5 Bxg5
+9.Nb5 O-O 10.d6 Nc6 11.a3 Rc8 12.e3 f5 13.Bd3 Bf6 14.Rd1 a6 15.Nc7 Ne5 16.Be2 Rxc7
+17.dxc7 Qxc7 18.Nxe5 Bxe5 19.f4 Bf6 20.O-O d5 21.b3 b5 22.Bf3 Rd8 23.Rb1 g6
+24.Rfc1 Rc8 25.Qe2 e5 26.fxe5 Qxe5 27.a4 Bg5 28.Re1 b4 29.Rbc1 Qd6 30.Rcd1 Re8
+31.Qd3 Re5 32.e4 Qe7 33.Qc2 fxe4 34.Bg4 Kg7 35.Rf1 d4 36.Be2 d3 37.Bxd3 exd3
+38.Qxd3 Re2 39.Rf2 Re1+ 40.Rf1 Qe3+ 41.Qxe3 Bxe3+ 42.Kh1 Rxf1+ 43.Rxf1 Bd5
+44.Re1 Bd4 45.Re7+ Kf6 46.Ra7 Bxb3 47.Rxa6+ Ke5 48.a5 c4 49.Rc6 c3 50.a6 c2
+51.Rc7 Kd6  0-1
+
+[Event "Prague ol"]
+[Site "Prague"]
+[Date "1931.??.??"]
+[Round "13"]
+[White "Monticelli, Mario"]
+[Black "unknown"]
+[Result "0-1"]
+[WhiteElo ""]
+[BlackElo ""]
+[ECO "D38"]
+
+1.d4 Nf6 2.Nf3 e6 3.c4 d5 4.Nc3 Bb4 5.Qb3 c5 6.a3 Bxc3+ 7.bxc3 O-O 8.Bg5 cxd4
+9.cxd4 Nc6 10.cxd5 exd5 11.Bxf6 gxf6 12.Qc3 Bf5 13.e3 Rc8 14.Nd2 Na5 15.Qb4 Rc2
+16.Bb5 Qb6 17.Nf3 Rfc8 18.O-O a6 19.Ba4 Rb2 20.Qe7 Qe6 21.Qxe6 Bxe6 22.h3 b5
+23.Bd1 Rc3 24.Nh4 Nc4 25.a4 b4 26.Bg4 b3 27.Bf5 Rd2  0-1
+
+[Event "Prague ol"]
+[Site "Prague"]
+[Date "1931.??.??"]
+[Round "1"]
+[White "unknown"]
+[Black "Cruusberg, Axel"]
+[Result "1-0"]
+[WhiteElo ""]
+[BlackElo ""]
+[ECO "D36"]
+
+1.d4 d5 2.Nf3 Nf6 3.c4 e6 4.Nc3 Nbd7 5.Bg5 c6 6.cxd5 exd5 7.e3 Be7 8.Qc2 O-O
+9.Bd3 Re8 10.O-O Nf8 11.Rae1 Be6 12.a3 Ng6 13.Ne5 Nd7 14.Bxe7 Qxe7 15.f4 Ndxe5
+16.dxe5 Bd7 17.Qf2 Nf8 18.e4 dxe4 19.Nxe4 Red8 20.Nd6 Be8 21.Qg3 g6 22.f5 f6
+23.fxg6 hxg6 24.Rxf6 Rxd6 25.Rxd6 Kg7 26.h4 Rd8 27.Qg5 Rd7 28.Qf6+ Kg8 29.Bc4+ Bf7
+30.Rxd7 Qxf6 31.exf6 Nxd7 32.Bxf7+  1-0

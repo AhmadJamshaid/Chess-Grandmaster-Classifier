@@ -1,0 +1,421 @@
+"""
+Chess Player Classification System - COMBINED & ENHANCED INFERENCE SCRIPT
+Reads PGN from user input, extracts features, and predicts the missing player
+using the optimized model (chess_player_classifier_optimized.pkl).
+"""
+
+import chess
+import chess.pgn
+import numpy as np
+import pickle
+import io
+import sys
+import os
+from collections import OrderedDict
+import warnings
+warnings.filterwarnings('ignore', category=UserWarning)
+
+# ==================== FEATURE EXTRACTION FUNCTIONS (Must be identical to Training) ====================
+# These functions must extract ALL POSSIBLE features, as the optimized model
+# will select the necessary subset using 'feature_names' later.
+
+def extract_metadata_features(headers):
+    """Extract features from Event, Site, Date, ECO, and Result."""
+    features = {}
+    
+    # Event features
+    event = headers.get('Event', '').lower()
+    features['event_has_world'] = 1 if 'world' in event else 0
+    features['event_has_championship'] = 1 if 'championship' in event or 'ch' in event else 0
+    features['event_has_open'] = 1 if 'open' in event else 0
+    features['event_has_tournament'] = 1 if 'tournament' in event or 'tourn' in event else 0
+    features['event_has_match'] = 1 if 'match' in event else 0
+    features['event_has_olympiad'] = 1 if 'olympiad' in event else 0
+    features['event_length'] = min(len(event), 100)
+    
+    # Site features
+    site = headers.get('Site', '').lower()
+    features['site_has_usa'] = 1 if 'usa' in site or 'us ' in site or 'new york' in site or 'chicago' in site else 0
+    features['site_has_europe'] = 1 if any(x in site for x in ['ger', 'fra', 'eng', 'ned', 'eur', 'london', 'paris', 'berlin']) else 0
+    features['site_has_asia'] = 1 if any(x in site for x in ['chn', 'ind', 'jpn', 'asia', 'beijing', 'shanghai']) else 0
+    features['site_has_russia'] = 1 if any(x in site for x in ['rus', 'soviet', 'ussr', 'moscow', 'leningrad']) else 0
+    features['site_has_argentina'] = 1 if 'arg' in site or 'argentina' in site or 'buenos aires' in site else 0
+    features['site_length'] = min(len(site), 50)
+    
+    # Date features
+    date_str = headers.get('Date', '????.??.??')
+    try:
+        if date_str != '????.??.??':
+            parts = date_str.split('.')
+            year = int(parts[0]) if parts[0] != '????' else 0
+            
+            features['year'] = year if year > 0 else 1950
+            features['month'] = int(parts[1]) if len(parts) > 1 and parts[1] != '??' else 6
+            features['day'] = int(parts[2]) if len(parts) > 2 and parts[2] != '??' else 15
+            features['decade'] = (year // 10) * 10 if year > 0 else 1950
+            features['is_1900s'] = 1 if 1900 <= year < 1920 else 0
+            features['is_1920s'] = 1 if 1920 <= year < 1940 else 0
+            features['is_1940s'] = 1 if 1940 <= year < 1960 else 0
+            features['is_1960s'] = 1 if 1960 <= year < 1980 else 0
+            features['is_1980s'] = 1 if 1980 <= year < 2000 else 0
+            features['is_2000s'] = 1 if year >= 2000 else 0
+        else:
+            features.update({'year': 1950, 'month': 6, 'day': 15, 'decade': 1950, 
+                             'is_1900s': 0, 'is_1920s': 0, 'is_1940s': 0, 
+                             'is_1960s': 0, 'is_1980s': 0, 'is_2000s': 0})
+    except:
+        features.update({'year': 1950, 'month': 6, 'day': 15, 'decade': 1950, 
+                         'is_1900s': 0, 'is_1920s': 0, 'is_1940s': 0, 
+                         'is_1960s': 0, 'is_1980s': 0, 'is_2000s': 0})
+
+    # ECO code
+    eco = headers.get('ECO', 'A00')
+    if eco and len(eco) >= 1:
+        features['eco_letter'] = ord(eco[0]) - ord('A') if eco[0].isalpha() else 0
+        features['eco_number'] = int(eco[1:]) if len(eco) > 1 and eco[1:].isdigit() else 0
+    else:
+        features['eco_letter'] = 0
+        features['eco_number'] = 0
+    
+    # Result
+    result = headers.get('Result', '*')
+    features['result_white_win'] = 1 if result == '1-0' else 0
+    features['result_black_win'] = 1 if result == '0-1' else 0
+    features['result_draw'] = 1 if result == '1/2-1/2' else 0
+    
+    return features
+
+def extract_opening_features(moves, max_opening_moves=12):
+    """Extract opening pattern features"""
+    features = {}
+    
+    if len(moves) == 0:
+        features.update({'opening_e4': 0, 'opening_d4': 0, 'opening_c4': 0, 'opening_nf3': 0,
+                         'opening_length': 0, 'early_knight_dev': 0, 'early_bishop_dev': 0,
+                         'early_castling': 0, 'early_queen_move': 0, 'opening_symmetry': 0})
+        return features
+    
+    opening_moves = moves[:max_opening_moves] if len(moves) >= max_opening_moves else moves
+    opening_str = ' '.join(opening_moves).lower()
+    
+    # First move analysis
+    first_move = opening_moves[0].lower() if opening_moves else ''
+    features['opening_e4'] = 1 if 'e4' in first_move else 0
+    features['opening_d4'] = 1 if 'd4' in first_move else 0
+    features['opening_c4'] = 1 if 'c4' in first_move else 0
+    features['opening_nf3'] = 1 if 'nf3' in first_move else 0
+    
+    features['opening_length'] = len(opening_moves)
+    features['early_knight_dev'] = min(opening_str.count('n'), 4)
+    features['early_bishop_dev'] = min(opening_str.count('b'), 4)
+    features['early_castling'] = 1 if 'o-o' in opening_str else 0
+    features['early_queen_move'] = 1 if 'q' in opening_str else 0
+    features['opening_symmetry'] = 1 if len(opening_moves) >= 4 and opening_moves[0] == opening_moves[1] else 0
+    
+    return features
+
+def extract_move_features(moves):
+    """Extract comprehensive features from move list"""
+    features = {}
+    board = chess.Board()
+    
+    num_moves = len(moves)
+    features['total_moves'] = num_moves
+    features['game_length_short'] = 1 if num_moves < 30 else 0
+    features['game_length_medium'] = 1 if 30 <= num_moves < 60 else 0
+    features['game_length_long'] = 1 if num_moves >= 60 else 0
+    
+    captures = checks = castles = promotions = 0
+    pawn_moves = knight_moves = bishop_moves = rook_moves = queen_moves = king_moves = 0
+    center_moves = edge_moves = 0
+    
+    material_scores = []
+    mobility_scores = []
+    
+    for move_san in moves:
+        try:
+            move = board.parse_san(move_san)
+            
+            # --- Move Type Analysis ---
+            if 'x' in move_san: captures += 1
+            if '+' in move_san: checks += 1
+            if '#' in move_san: checks += 2
+            if 'O-O' in move_san or '0-0' in move_san: castles += 1
+            if '=' in move_san: promotions += 1
+            
+            # --- Piece Type Analysis ---
+            piece = board.piece_at(move.from_square)
+            if piece:
+                piece_type = piece.piece_type
+                if piece_type == chess.PAWN: pawn_moves += 1
+                elif piece_type == chess.KNIGHT: knight_moves += 1
+                elif piece_type == chess.BISHOP: bishop_moves += 1
+                elif piece_type == chess.ROOK: rook_moves += 1
+                elif piece_type == chess.QUEEN: queen_moves += 1
+                elif piece_type == chess.KING: king_moves += 1
+            
+            # --- Positional Analysis ---
+            if move.to_square in [chess.D4, chess.E4, chess.D5, chess.E5]: center_moves += 1
+            to_file = chess.square_file(move.to_square)
+            to_rank = chess.square_rank(move.to_square)
+            if to_file in [0, 7] or to_rank in [0, 7]: edge_moves += 1
+            
+            # Push move and calculate state metrics
+            board.push(move)
+            
+            def piece_count(piece_type, color):
+                return len(board.pieces(piece_type, color))
+
+            material_white = (piece_count(chess.PAWN, chess.WHITE) * 1 + piece_count(chess.KNIGHT, chess.WHITE) * 3 +
+                              piece_count(chess.BISHOP, chess.WHITE) * 3 + piece_count(chess.ROOK, chess.WHITE) * 5 +
+                              piece_count(chess.QUEEN, chess.WHITE) * 9)
+            material_black = (piece_count(chess.PAWN, chess.BLACK) * 1 + piece_count(chess.KNIGHT, chess.BLACK) * 3 +
+                              piece_count(chess.BISHOP, chess.BLACK) * 3 + piece_count(chess.ROOK, chess.BLACK) * 5 +
+                              piece_count(chess.QUEEN, chess.BLACK) * 9)
+            material_scores.append(material_white - material_black)
+            mobility_scores.append(board.legal_moves.count())
+            
+        except Exception:
+            continue
+    
+    # --- Aggregate Features ---
+    features.update({
+        'captures': captures, 'checks': checks, 'castles': castles, 'promotions': promotions,
+        'pawn_moves': pawn_moves, 'knight_moves': knight_moves, 'bishop_moves': bishop_moves,
+        'rook_moves': rook_moves, 'queen_moves': queen_moves, 'king_moves': king_moves,
+        'center_moves': center_moves, 'edge_moves': edge_moves,
+    })
+    
+    if num_moves > 0:
+        features.update({
+            'capture_rate': captures/num_moves, 'check_rate': checks/num_moves, 
+            'pawn_move_rate': pawn_moves/num_moves, 'knight_move_rate': knight_moves/num_moves, 
+            'bishop_move_rate': bishop_moves/num_moves, 'rook_move_rate': rook_moves/num_moves, 
+            'queen_move_rate': queen_moves/num_moves, 
+            'piece_move_rate': (knight_moves + bishop_moves + rook_moves + queen_moves)/num_moves,
+            'center_rate': center_moves/num_moves,
+            'tactical_complexity': (captures + checks + promotions) / num_moves
+        })
+    else:
+         features.update({'capture_rate': 0, 'check_rate': 0, 'pawn_move_rate': 0, 'knight_move_rate': 0, 
+                         'bishop_move_rate': 0, 'rook_move_rate': 0, 'queen_move_rate': 0, 
+                         'piece_move_rate': 0, 'center_rate': 0, 'tactical_complexity': 0})
+    
+    if material_scores:
+        features.update({
+            'avg_material': np.mean(material_scores), 'max_material': np.max(material_scores), 
+            'min_material': np.min(material_scores), 'material_variance': np.var(material_scores), 
+            'material_range': np.max(material_scores) - np.min(material_scores)
+        })
+    else:
+        features.update({'avg_material': 0, 'max_material': 0, 'min_material': 0, 
+                         'material_variance': 0, 'material_range': 0})
+    
+    if mobility_scores:
+        features.update({
+            'avg_mobility': np.mean(mobility_scores), 'max_mobility': np.max(mobility_scores), 
+            'min_mobility': np.min(mobility_scores), 'mobility_variance': np.var(mobility_scores)
+        })
+    else:
+        features.update({'avg_mobility': 0, 'max_mobility': 0, 'min_mobility': 0, 'mobility_variance': 0})
+    
+    return features
+
+
+def extract_features_for_prediction(pgn_text):
+    """
+    Extracts ALL possible features from PGN text and determines the missing player's color.
+    
+    Includes robust move extraction and refined missing player detection to handle
+    various PGN formatting issues and ensure only one player is identified as missing.
+    """
+    from collections import OrderedDict
+    
+    # 1. Parse PGN and get headers/moves
+    try:
+        pgn = io.StringIO(pgn_text)
+        game = chess.pgn.read_game(pgn)
+        if game is None:
+            return None, None, "Could not parse PGN (game object is None)."
+        
+        headers = dict(game.headers)
+        
+        # --- FIX: Robust Move Extraction ---
+        # Iterate the mainline and push to a board to correctly generate SAN and avoid
+        # errors from corrupted or non-move objects at the end of the PGN stream.
+        moves = []
+        temp_board = game.board() # Start board at initial position
+        
+        for move in game.mainline_moves():
+            try:
+                # Use the move object to generate SAN from the current board state
+                move_san = temp_board.san(move)
+                moves.append(move_san)
+                temp_board.push(move)
+            except Exception as e:
+                # Catch the specific error related to board.san(move) failing (like the c5d4 error)
+                # and stop processing moves for this game.
+                # print(f"DEBUG: Failed move processing: {e}") 
+                break 
+        # --- END FIX ---
+        
+        if len(moves) < 10:
+            return None, None, "Game is too short (less than 10 moves)."
+            
+    except Exception as e:
+        return None, None, f"Parsing error: {e}"
+
+    # 2. Detect missing player (our target for classification)
+    white_name = headers.get('White', '').strip().lower()
+    black_name = headers.get('Black', '').strip().lower()
+    
+    # Standard missing indicators
+    missing_indicators = {'', '?', 'unknown', 'missing', 'player', '____', '--'}
+    
+    # Check if name exactly matches or is empty (primary check)
+    is_white_missing = white_name in missing_indicators
+    is_black_missing = black_name in missing_indicators
+
+    # Check for partial placeholder matches if primary check failed
+    if not is_white_missing:
+         is_white_missing = any(ind in white_name for ind in ['unkn', 'player', '___', '--'])
+
+    if not is_black_missing:
+         is_black_missing = any(ind in black_name for ind in ['unkn', 'player', '___', '--'])
+
+    # --- CRITICAL LOGIC ---
+    if is_white_missing and is_black_missing:
+        return None, None, "Both players are marked as missing/unknown. Please ensure only one player is marked as 'unknown', '?', or '--'."
+    elif not is_white_missing and not is_black_missing:
+         return None, None, f"Both players ('{headers.get('White')}' vs '{headers.get('Black')}') appear to be known. Cannot determine which side to classify."
+    
+    missing_color = 'White' if is_white_missing else 'Black'
+    
+    # 3. Extract all features (in OrderedDict for safety)
+    features = OrderedDict()
+    features['is_white'] = 1 if missing_color == 'White' else 0
+    features['is_black'] = 1 if missing_color == 'Black' else 0
+    
+    features.update(extract_metadata_features(headers))
+    features.update(extract_opening_features(moves))
+    features.update(extract_move_features(moves))
+    
+    return features, missing_color, None
+# ==================== MAIN INFERENCE PIPELINE ====================
+
+def main_predict():
+    """Main function to prompt for PGN and run prediction."""
+    
+    MODEL_PATH = 'chess_player_classifier_optimized.pkl'
+    
+    print("=" * 80)
+    print("🔮 CHESS PLAYER CLASSIFICATION - INFERENCE")
+    print("=" * 80)
+    
+    # --- Step 1: Load Model ---
+    print("\n[1/3] Loading optimized model...")
+    try:
+        with open(MODEL_PATH, 'rb') as f:
+            model_data = pickle.load(f)
+        
+        model = model_data['model']
+        scaler = model_data['scaler']
+        label_encoder = model_data['label_encoder']
+        feature_names = model_data['feature_names'] # The critical subset of features
+        
+        print("✓ Model loaded successfully.")
+        print(f"  Players: {', '.join(label_encoder.classes_)}")
+        print(f"  Features required: {len(feature_names)}")
+        print(f"  Trained Test Accuracy: {model_data.get('test_accuracy', 0)*100:.2f}%")
+        
+    except FileNotFoundError:
+        print(f"✗ ERROR: Model file not found at {MODEL_PATH}")
+        print("  Please run the enhanced training script first to generate this file.")
+        return
+    except Exception as e:
+        print(f"✗ ERROR loading model: {e}")
+        return
+
+    # --- Step 2: Get User Input PGN ---
+    print("\n[2/3] Awaiting PGN input...")
+    print("  Please paste the PGN text below. Press Ctrl+Z (Windows) or Ctrl+D (Unix) then Enter to finish input.")
+    
+    pgn_lines = sys.stdin.readlines()
+    pgn_input = "".join(pgn_lines).strip()
+    
+    if not pgn_input:
+        print("✗ No PGN provided. Exiting.")
+        return
+
+    # --- Step 3: Extract Features ---
+    print("\n[3/3] Extracting and processing features...")
+    features_full, missing_color, error_message = extract_features_for_prediction(pgn_input)
+
+    if features_full is None:
+        print(f"✗ Extraction failed. Reason: {error_message}")
+        return
+
+    print(f"✓ Parsed game successfully. Target player is: {missing_color}")
+    print(f"✓ Total features extracted: {len(features_full)}")
+    
+    # --- Step 4: Prepare Feature Vector for Prediction ---
+    try:
+        # Construct the feature vector using ONLY the required features (from RFECV)
+        # and ensuring they are in the correct order.
+        feature_vector = []
+        for fname in feature_names:
+            # Use .get() in case a feature was somehow missing (default to 0)
+            feature_vector.append(features_full.get(fname, 0)) 
+        
+        X = np.array([feature_vector])
+        X_scaled = scaler.transform(X)
+        
+    except Exception as e:
+        print(f"✗ ERROR preparing prediction vector: {e}")
+        return
+
+    # --- Step 5: Predict ---
+    try:
+        # Predict class index and get probabilities
+        prediction_index = model.predict(X_scaled)[0]
+        probabilities = model.predict_proba(X_scaled)[0]
+        
+        predicted_player = label_encoder.inverse_transform([prediction_index])[0]
+        
+    except Exception as e:
+        print(f"✗ ERROR making prediction: {e}")
+        return
+
+    # --- Step 6: Display Results ---
+    print("✓ Prediction complete!")
+    print("\n" + "=" * 80)
+    print("🎯 PREDICTION RESULTS")
+    print("=" * 80)
+    
+    print(f"\n  Predicted Player: **{predicted_player}**")
+    print(f"  Playing as: **{missing_color}**")
+    print(f"  Confidence: {probabilities[prediction_index]*100:.2f}%")
+    
+    print(f"\n" + "-" * 80)
+    print("  CONFIDENCE SCORES (Why the Model Chose This Player)")
+    print("-" * 80)
+    
+    # Sort probabilities for display
+    sorted_indices = np.argsort(probabilities)[::-1]
+    
+    for idx in sorted_indices:
+        player = label_encoder.classes_[idx]
+        prob = probabilities[idx] * 100
+        # Simple text-based confidence bar
+        bar_length = int(prob / 2.5) 
+        bar = '█' * bar_length
+        marker = " ← PREDICTED" if idx == prediction_index else ""
+        print(f"  {player:12s}: {prob:6.2f}%  {bar}{marker}")
+    
+    print("\n" + "=" * 80)
+    
+    # Trigger image to help user understand the underlying data driving the classification
+    print("")
+
+if __name__ == "__main__":
+    main_predict()
